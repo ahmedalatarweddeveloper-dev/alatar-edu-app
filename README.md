@@ -1,0 +1,1 @@
+# alatar-edu-app
