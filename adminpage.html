@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>لوحة تحكم أكاديمية العطار - الإصدار النهائي</title>
+<style>
+:root { --primary:#2c3e50; --secondary:#3498db; --danger:#e74c3c; --success:#27ae60; --light:#ecf0f1; }
+body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:var(--light); margin:0; padding:20px; color:#333; }
+.container { max-width:1200px; margin:auto; }
+h2 { text-align:center; color:var(--primary); margin-bottom:30px; border-bottom:2px solid var(--secondary); padding-bottom:10px; }
+
+/* العدادات */
+.stats-container { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:15px; margin-bottom:30px; }
+.stat-card { background:white; padding:20px; border-radius:12px; text-align:center; box-shadow:0 4px 6px rgba(0,0,0,0.1); border-top:5px solid var(--secondary); transition:0.3s; }
+.stat-card h3 { margin:0; font-size:0.9rem; color:#7f8c8d; }
+.stat-card p { font-size:2.2rem; font-weight:bold; margin:10px 0 0; color:var(--primary); }
+
+/* الأزرار */
+.controls { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-bottom:25px; }
+button { padding:12px 20px; cursor:pointer; border:none; border-radius:8px; background:var(--primary); color:white; font-weight:bold; }
+button:hover { opacity:0.9; }
+.btn-show { background:var(--secondary); }
+.delete-btn { background:var(--danger); padding:5px 15px; font-size:0.8rem; margin-top:10px; border-radius:4px; }
+
+/* منطقة العرض */
+.content-area { background:white; padding:20px; border-radius:12px; box-shadow:0 4px 15px rgba(0,0,0,0.05); min-height:200px; }
+.item-card { background:#fff; border:1px solid #eee; padding:15px; margin-bottom:15px; border-radius:8px; border-right:5px solid var(--secondary); }
+.details-box { display:none; margin-top:15px; padding:15px; background:#f7f9fb; border:1px dashed #ccc; border-radius:8px; }
+.question-box { background:#f0f3f7; padding:10px 15px; border-radius:6px; margin-bottom:10px; border-left:4px solid var(--secondary); }
+.question-box strong { display:block; margin-bottom:5px; color:var(--primary); }
+.badge { background:#eef2f7; padding:4px 10px; border-radius:6px; font-size:0.85rem; color:#34495e; margin-left:5px; border:1px solid #dcdde1; }
+</style>
+</head>
+<body>
+
+<div class="container">
+<h2>لوحة تحكم أكاديمية العطار</h2>
+
+<div class="stats-container">
+<div class="stat-card"><h3>المدرسين</h3><p id="count-teachers">0</p></div>
+<div class="stat-card"><h3>الطلاب</h3><p id="count-students">0</p></div>
+<div class="stat-card"><h3>المقالات</h3><p id="count-reviews">0</p></div>
+<div class="stat-card" style="border-top-color: var(--success);"><h3>إجمالي الأسئلة</h3><p id="count-questions">0</p></div>
+<div class="stat-card" style="border-top-color: var(--success);"><h3>إجمالي الامتحانات</h3><p id="count-exams">0</p></div>
+</div>
+
+<div class="controls">
+<button class="btn-show" onclick="showData('teachers')">عرض المدرسين</button>
+<button class="btn-show" onclick="showData('students')">عرض الطلاب</button>
+<button class="btn-show" onclick="showData('reviews')">عرض المقالات</button>
+<button class="btn-show" onclick="showData('questions')">عرض الأسئلة</button>
+<button class="btn-show" onclick="showData('exams')">عرض الامتحانات</button>
+</div>
+
+<div class="content-area" id="display-panel">
+<p style="text-align:center; color:#999;">اختر قسماً لعرض بياناته...</p>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+const firebaseConfig = { databaseURL:"https://alatar-education-academy-5255b-default-rtdb.firebaseio.com" };
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+function initCounters(){
+onValue(ref(db,'users'), snap => {
+const data = snap.val()||{};
+document.getElementById('count-teachers').innerText = data.teacher?Object.keys(data.teacher).length:0;
+document.getElementById('count-students').innerText = data.student?Object.keys(data.student).length:0;
+});
+onValue(ref(db,'reviews'), snap => {
+document.getElementById('count-reviews').innerText = snap.exists()?Object.keys(snap.val()).length:0;
+});
+['questions','exams'].forEach(path => {
+onValue(ref(db,path), snap => {
+let total=0;
+if(snap.exists()){ const allData=snap.val(); Object.keys(allData).forEach(sub=>{ total+=Object.keys(allData[sub]).length; }); }
+document.getElementById(`count-${path}`).innerText=total;
+});
+});
+}
+initCounters();
+
+window.showData=function(type){
+const panel=document.getElementById('display-panel');
+panel.innerHTML="<p style='text-align:center;'>جاري التحميل...</p>";
+let dbPath=type;
+if(type==='teachers') dbPath='users/teacher';
+if(type==='students') dbPath='users/student';
+onValue(ref(db,dbPath), snap=>{
+panel.innerHTML="";
+const data=snap.val();
+if(!data){ panel.innerHTML="<p style='text-align:center;'>لا توجد بيانات.</p>"; return; }
+if(type==='questions' || type==='exams'){
+Object.keys(data).forEach(subject=>{
+Object.keys(data[subject]).forEach(id=>{
+renderCard(type,id,data[subject][id],panel,subject);
+});
+});
+} else {
+Object.keys(data).forEach(id=>{ renderCard(type,id,data[id],panel); });
+}
+});
+};
+
+function renderCard(type,id,item,container,subject=null){
+const div=document.createElement('div'); div.className='item-card';
+let header="", body="";
+if(type==='reviews'){
+header=`<strong>${item.title||'بدون عنوان'}</strong> <span class="badge">المؤلف: ${item.user}</span>`;
+body=`المراجعة: ${item.review}`;
+}else if(type==='teachers'||type==='students'){
+header=`<strong>${item.name}</strong> <span class="badge">الهاتف: ${item.phone}</span>`;
+body=`البريد: ${item.email} <br> الدور: ${item.role}`;
+}else if(type==='questions'){
+header=`<span class="badge" style="color:var(--secondary)">${subject}</span> <strong>${item.question}</strong>`;
+body=`الخيارات: ${item.options?Object.values(item.options).join(' | '):'لا يوجد'} <br> الإجابة: ${item.correctAnswer}`;
+}else if(type==='exams'){
+header=`<span class="badge" style="color:var(--success)">${subject}</span> <strong>${item.title}</strong>`;
+let questionsList="";
+if(item.questions && Array.isArray(item.questions)){
+item.questions.forEach(q=>{
+questionsList+=`<div class="question-box"><strong>${q.question}</strong>الخيارات: ${q.options?Object.values(q.options).join(' | '):'لا يوجد'}<br>الإجابة: ${q.correctAnswer}</div>`;
+});
+}else{ questionsList=item.question || 'متعدد'; }
+body=`المدة: ${item.duration} دقيقة <br>${questionsList}`;
+}
+div.innerHTML=`<div>${header}</div>
+<button style="margin-top:10px; background:#f39c12; font-size:0.8rem;" onclick="const d=document.getElementById('det-${id}'); d.style.display=d.style.display==='block'?'none':'block'">التفاصيل</button>
+<button class="delete-btn" onclick="deleteItem('${type}','${id}','${subject}')">حذف</button>
+<div id="det-${id}" class="details-box">${body}</div>`;
+container.appendChild(div);
+}
+
+window.deleteItem=function(type,id,subject){
+if(!confirm("حذف نهائي؟")) return;
+let path="";
+if(type==='teachers') path=`users/teacher/${id}`;
+else if(type==='students') path=`users/student/${id}`;
+else if(subject && subject!=='null') path=`${type}/${subject}/${id}`;
+else path=`${type}/${id}`;
+remove(ref(db,path)).then(()=>alert("تم الحذف"));
+};
+</script>
+
+</body>
+</html>
